@@ -13,5 +13,8 @@ UCLASS()
 class PROJECTALPHA_API AAlphaCombatGameMode : public AGameMode
 {
 	GENERATED_BODY()
-	
+
+public:
+	virtual void PlayerEliminated(class AAlphaCharacter* ElimmedCharacter, class AAlphaPlayerController* VictimController, class AAlphaPlayerController* AttackerController);
+	virtual void RequestRespawn(class ACharacter* ElimmedCharacter, AController* ElimmedController);
 };

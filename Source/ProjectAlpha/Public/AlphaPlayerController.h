@@ -15,7 +15,8 @@ class PROJECTALPHA_API AAlphaPlayerController : public APlayerController
 	GENERATED_BODY()
 public:
 	void SetCrosshair(class UCrossHairDataAsset* Crosshair);
-
+	UFUNCTION(BlueprintImplementableEvent)
+	void ShowSniperScopeWidget(bool bShowScope);
 private:
 	class AAlphaCombatHUD* CombatHUD;
 };

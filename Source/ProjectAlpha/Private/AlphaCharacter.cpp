@@ -2,14 +2,17 @@
 
 
 #include "AlphaCharacter.h"
+#include "AlphaPlayerController.h"
+#include "AlphaCombatGameMode.h"
+#include "../ProjectAlpha.h"
 #include "GameFramework/SpringArmComponent.h"
+#include "GameFramework/CharacterMovementComponent.h"
 #include "Camera/CameraComponent.h"
 #include "Weapon.h"
 #include "Net/UnrealNetwork.h"
-#include "GameFramework/CharacterMovementComponent.h"
 #include "Components/CapsuleComponent.h"
 #include "AlphaComponents/CombatComponent.h"
-#include "../ProjectAlpha.h"
+#include "TimerManager.h"
 
 
 // Sets default values
@@ -17,6 +20,7 @@ AAlphaCharacter::AAlphaCharacter()
 {
  	// Set this character to call Tick() every frame.  You can turn this off to improve performance if you don't need it.
 	PrimaryActorTick.bCanEverTick = true;
+	SpawnCollisionHandlingMethod = ESpawnActorCollisionHandlingMethod::AdjustIfPossibleButAlwaysSpawn;
 
 	CameraBoom = CreateDefaultSubobject<USpringArmComponent>(TEXT("CameraBoom"));
 	CameraBoom->SetupAttachment(GetMesh());
@@ -138,7 +142,55 @@ void AAlphaCharacter::ReceiveDamage(AActor* DamageActor, float Damage, const UDa
 {
 	Health = FMath::Clamp(Health - Damage, 0, MaxHealth);
 	PlayHitReactMontage();
-	UE_LOG(LogTemp, Warning, TEXT("Health : %f"), Health);
+	
+	if (Health == 0.f)
+	{
+		auto CombatGameMode = GetWorld()->GetAuthGameMode<AAlphaCombatGameMode>();
+		if (CombatGameMode)
+		{
+			AlphaController = AlphaController ? AlphaController : Cast<AAlphaPlayerController>(Controller);
+			auto AttackerController = Cast< AAlphaPlayerController>(InstigatorController);
+			CombatGameMode->PlayerEliminated(this, AlphaController, AttackerController);
+		}
+	}
+}
+
+
+void AAlphaCharacter::Elim()
+{
+	if (Combat && Combat->EquippedWeapon)
+	{
+		Combat->EquippedWeapon->Dropped();
+		Combat->ClientApplyCrosshair(nullptr);
+	}
+	MulticastElim();
+	GetWorldTimerManager().SetTimer(
+		ElimTimer,
+		this,
+		&AAlphaCharacter::ElimTimerFinished,
+		ElimDelay
+	);
+	if (IsLocallyControlled() && Combat->bAiming && Combat->EquippedWeapon && Combat->EquippedWeapon->GetWeaponType() == EWeaponType::EWT_SniperRifle)
+	{
+		AlphaController->ShowSniperScopeWidget(false);
+	}
+}
+
+void AAlphaCharacter::ElimTimerFinished()
+{
+	auto CombatGameMoce = GetWorld()->GetAuthGameMode<AAlphaCombatGameMode>();
+	if (CombatGameMoce)
+	{
+		CombatGameMoce->RequestRespawn(this, Controller);
+	}
+}
+
+void AAlphaCharacter::ReloadButtonPressed()
+{
+	if (Combat)
+	{
+		Combat->Reload();
+	}
 }
 
 
@@ -154,6 +206,23 @@ void AAlphaCharacter::OnRep_OverlappingWeapon(AWeapon* LastWeapon)
 	}
 }
 
+void AAlphaCharacter::MulticastElim_Implementation()
+{
+	bElimmed = true;
+	PlayElimMontage();
+
+	//Disable character movement;
+	GetCharacterMovement()->DisableMovement();
+	GetCharacterMovement()->StopMovementImmediately();
+
+	if (AlphaController)
+	{
+		DisableInput(AlphaController);
+	}
+	// Disable Collision
+	GetCapsuleComponent()->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+	GetMesh()->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+}
 
 
 void AAlphaCharacter::SetOverlappingWeapon(AWeapon* Weapon)
@@ -169,8 +238,6 @@ void AAlphaCharacter::SetOverlappingWeapon(AWeapon* Weapon)
 		OverlappingWeapon->ShowPickupWidget(OverlappingWeapon != nullptr);
 	}
 }
-
-
 
 void AAlphaCharacter::EquipButtonPressed()
 {

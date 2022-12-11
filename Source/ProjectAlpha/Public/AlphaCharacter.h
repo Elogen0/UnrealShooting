@@ -5,7 +5,8 @@
 #include "CoreMinimal.h"
 #include "GameFramework/Character.h"
 #include "Interfaces/InteractWithCrosshairsInterface.h"
-
+#include "Components/TimelineComponent.h"
+#include "Weapon/WeaponTypes.h"
 #include "AlphaCharacter.generated.h"
 
 class AWeapon;
@@ -23,12 +24,16 @@ public:
 	virtual void PostInitializeComponents() override;
 	virtual void Jump() override;
 	void SetOverlappingWeapon(AWeapon* Weapon);
+	void Elim();
 	
-
 	UFUNCTION(BlueprintImplementableEvent)
 	void PlayFireMontage(bool bAiming);
 	UFUNCTION(BlueprintImplementableEvent)
 	void PlayHitReactMontage();
+	UFUNCTION(BlueprintImplementableEvent)
+	void PlayElimMontage();
+	UFUNCTION(BlueprintImplementableEvent)
+	void PlayReloadMontage(EWeaponType WeaponType);
 	UFUNCTION(BlueprintImplementableEvent, BlueprintCallable)
 	void BP_ReplicatedMovement();
 
@@ -41,11 +46,10 @@ public:
 	UFUNCTION(BlueprintPure)
 	float CalculateMovementSpeed();
 
-	FORCEINLINE class UCameraComponent* GetFollowCamera() { return FollowCamera; }
+	UFUNCTION(BlueprintCallable)
+	void ReloadButtonPressed();
 
-	///////////
-	//Network//
-	//////////
+	FORCEINLINE class UCameraComponent* GetFollowCamera() { return FollowCamera; }
 protected:
 	// Called when the game starts or when spawned
 	virtual void BeginPlay() override;
@@ -54,6 +58,7 @@ protected:
 	UFUNCTION()
 	void ReceiveDamage(AActor* DamageActor, float Damage, const UDamageType* DamageType, class AController* InstigatorController, AActor* DamageCuaser);
 
+	void ElimTimerFinished();
 	///////////
 	//Network//
 	///////////
@@ -64,12 +69,17 @@ protected:
 	virtual void OnRep_ReplicatedMovement() override;
 	UFUNCTION()	
 	void OnRep_Health();
+	UFUNCTION(NetMulticast, Reliable)
+	void MulticastElim();
 	
 public:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly)
 	class UCombatComponent* Combat;
 
 protected:
+	UPROPERTY()
+	class AAlphaPlayerController* AlphaController;
+
 	UPROPERTY(VisibleAnywhere, BlueprintReadWrite, Category = Camera)
 	class UCameraComponent* FollowCamera;
 	UPROPERTY(VisibleAnywhere, BlueprintReadWrite, Category = Camera)
@@ -83,4 +93,10 @@ protected:
 	float MaxHealth = 100.f;
 	UPROPERTY(ReplicatedUsing=OnRep_Health, VisibleAnywhere, BlueprintReadWrite, Category = "Player Stats")
 	float Health = 100.f;
+	UPROPERTY(BlueprintReadWrite, Category = "Player Stats", meta = (AllowPrivateAccess = "true"))
+	bool bElimmed = false;
+	UPROPERTY(EditDefaultsOnly)
+	float ElimDelay = 3.f;
+	FTimerHandle ElimTimer;
+
 };

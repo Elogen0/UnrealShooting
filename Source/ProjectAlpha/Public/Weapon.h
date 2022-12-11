@@ -4,6 +4,7 @@
 
 #include "CoreMinimal.h"
 #include "GameFramework/Actor.h"
+#include "Weapon/WeaponTypes.h"
 #include "Weapon.generated.h"
 
 UENUM(BlueprintType)
@@ -28,11 +29,19 @@ public:
 
 	void SetWeaponState(EWeaponState State);
 	virtual void Fire(const FVector& HitTarget);
+	void Dropped();
+	void SpendRound();
+	bool IsEmpty();
+	bool IsFull();
+	void AddAmmo(int32 AmmoToAdd);
 
 	UFUNCTION(BlueprintPure)
 	FORCEINLINE USkeletalMeshComponent* GetWeaponMesh() const { return WeaponMesh; }
-	FORCEINLINE class UCrossHairDataAsset* GetCrosshair() { return Crosshair; }
-
+	FORCEINLINE class UCrossHairDataAsset* GetCrosshair() const { return Crosshair; }
+	UFUNCTION(BlueprintPure)
+	FORCEINLINE EWeaponType GetWeaponType() { return WeaponType; }
+	FORCEINLINE int32 GetAmmo() const { return Ammo; }
+	FORCEINLINE int32 GetMagCapacity() const { return MagCapacity; }
 protected:
 	virtual void BeginPlay() override;
 	void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
@@ -55,12 +64,17 @@ protected:
 	UFUNCTION()
 	void OnRep_WeaponState();
 	void WeaponStateChanedProcess();
+	UFUNCTION()
+	void OnRep_Ammo();
 
 public:
-	UPROPERTY(EditAnywhere, Category = "Automatic Fire")
+	UPROPERTY(EditAnywhere, Category = "Weapon")
 	float FireDelay = .15f;
-	UPROPERTY(EditAnywhere, Category = "Automatic Fire")
+	UPROPERTY(EditAnywhere, Category = "Weapon")
 	bool bAutomatic = true;
+
+	UPROPERTY(EditAnywhere, Category="Weapon")
+	class USoundCue* EquipSound;
 protected:
 	UPROPERTY(VisibleAnywhere, Category = "Weapon Properties")
 	USkeletalMeshComponent* WeaponMesh;
@@ -74,14 +88,21 @@ protected:
 	UPROPERTY(VisibleAnywhere, Category = "Weapon Properties")
 	class UWidgetComponent* PickupWidget;
 
-	UPROPERTY(EditAnywhere, Category = "Weapon Properties")
+	UPROPERTY(EditAnywhere, Category = "Weapon")
 	class UAnimationAsset* FireAnimation;
 
 	UPROPERTY(EditAnywhere)
 	TSubclassOf<class ABulletCasing> CasingClass;
 
-	UPROPERTY(EditAnywhere, Instanced)
+	UPROPERTY(EditAnywhere, Instanced, Category = "Weapon")
 	UCrossHairDataAsset* Crosshair;
 
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Weapon", ReplicatedUsing = OnRep_Ammo)
+	int32 Ammo = 30;
 
+	UPROPERTY(EditAnywhere, Category = "Weapon")
+	int32 MagCapacity = 30;
+
+	UPROPERTY(EditAnywhere, Category = "Weapon")
+	EWeaponType WeaponType;
 };
